@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CodeTeen PRO — Образовательная платформа</title>
+<style>
+/* Базовые настройки для мобильных устройств */
+* { box-sizing: border-box; }
+
+body { 
+    font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+    margin:0; 
+    min-height:100vh; 
+    display:flex; 
+    justify-content:center; 
+    align-items:center; 
+    background:linear-gradient(135deg,#667eea,#764ba2);
+    padding: 20px;
+}
+
+.container { max-width:500px; width:100%; }
+
+.card { 
+    background:white; 
+    padding:25px; 
+    border-radius:20px; 
+    box-shadow:0 10px 30px rgba(0,0,0,0.2); 
+    text-align:center; 
+    margin-bottom:15px;
+    width: 100%;
+}
+
+.hidden { display:none; }
+
+/* Стили полей ввода и ошибок */
+input { 
+    width:100%; 
+    padding:14px; 
+    margin:10px 0; 
+    border-radius:12px; 
+    border:2px solid #ddd;
+    font-size: 16px;
+    transition: all 0.3s;
+}
+
+.input-error {
+    border-color: #f44336 !important;
+    background-color: #fff8f8;
+    animation: shake 0.4s;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-8px); }
+    75% { transform: translateX(8px); }
+}
+
+/* Кнопки */
+button { 
+    width:100%; 
+    padding:15px; 
+    margin-top:10px; 
+    border:none; 
+    border-radius:12px; 
+    background:linear-gradient(135deg,#667eea,#764ba2); 
+    color:white; 
+    cursor:pointer; 
+    font-size: 16px;
+    font-weight: 600;
+    transition: 0.2s;
+}
+
+button:active { transform: scale(0.98); }
+
+.correct { background:#4CAF50 !important; }
+.wrong { background:#f44336 !important; }
+.selected { background:#FFD700 !important; color:black; }
+.retry-btn { background: #FF9800 !important; margin-top: 15px; }
+.cert-btn { background: #2ecc71 !important; margin-top: 10px; }
+
+/* Адаптивное видео */
+.video-container {
+    position: relative;
+    padding-bottom: 56.25%;
+    height: 0;
+    overflow: hidden;
+    border-radius: 12px;
+    margin-bottom: 15px;
+}
+
+iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
+
+@media (max-width: 380px) {
+    .card { padding: 15px; }
+    h2 { font-size: 20px; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+    <div id="registerDiv" class="card">
+      <h2>Регистрация</h2>
+      <input id="regLogin" placeholder="Придумайте логин">
+      <input id="regPass" type="password" placeholder="Придумайте пароль">
+      <button onclick="register()">Зарегистрироваться</button>
+      <button style="background:none; color:#764ba2;" onclick="showLogin()">Уже есть аккаунт? Войти</button>
+    </div>
+
+    <div id="loginDiv" class="card hidden">
+      <h2>Вход</h2>
+      <input id="loginUser" placeholder="Логин">
+      <input id="loginPass" type="password" placeholder="Пароль">
+      <button onclick="login()">Войти</button>
+      <button style="background:none; color:#764ba2;" onclick="showRegister()">Создать аккаунт</button>
+    </div>
+
+    <div id="profile" class="card hidden">
+      <h2 id="welcome"></h2>
+      <button onclick="openCourses()">Перейти к курсам</button>
+      <button style="background:#ddd; color:black;" onclick="logout()">Выйти</button>
+    </div>
+
+    <div id="courses" class="card hidden">
+      <h2>Доступные курсы</h2>
+      <button onclick="openLesson(1)">HTML Fundamentals</button>
+      <button onclick="openLesson(2)">CSS Styling PRO</button>
+      <button onclick="openLesson(3)">JavaScript Logic</button>
+      <button style="background:#ddd; color:black;" onclick="backToProfile()">В профиль</button>
+    </div>
+
+    <div id="lesson" class="card hidden">
+      <h2 id="lessonTitle"></h2>
+      <div class="video-container">
+        <iframe id="video" allowfullscreen></iframe>
+      </div>
+      <button onclick="startTest()">Пройти финальный тест</button>
+      <button style="background:#ddd; color:black;" onclick="back()">К списку курсов</button>
+    </div>
+
+    <div id="test" class="card hidden">
+      <h2>Тестирование</h2>
+      <div id="questions"></div>
+      <button onclick="showResult()">Проверить ответы</button>
+    </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script>
+let user = null;
+let currentLesson = 1;
+let userAnswers = [];
+
+const lessons = {
+  1: { title:"HTML Fundamentals", video:"https://www.youtube.com/embed/UB1O30fR-EE" },
+  2: { title:"CSS Styling PRO", video:"https://www.youtube.com/embed/yfoY53QXEnI" },
+  3: { title:"JavaScript Logic", video:"https://www.youtube.com/embed/W6NZfCO5SIk" }
+};
+
+const tests = {
+  1: [
+    { q:"HTML — это?", a:["Язык разметки","Язык программирования"], correct:0 },
+    { q:"Какой тег используется для заголовка самого высокого уровня?", a:["<h6>","<h1>"], correct:1 }
+  ],
+  2: [
+    { q:"Какое свойство CSS отвечает за цвет текста?", a:["color","background-color"], correct:0 },
+    { q:"Как сделать текст жирным?", a:["font-weight: bold","text-style: bold"], correct:0 }
+  ],
+  3: [
+    { q:"Как объявить переменную в современном JS?", a:["var","const / let"], correct:1 },
+    { q:"Какое ключевое слово создает функцию?", a:["function","def"], correct:0 }
+  ]
+};
+
+// Навигация
+function hideAll(){ document.querySelectorAll('.card').forEach(el=>el.classList.add('hidden')); }
+function showRegister(){ hideAll(); document.getElementById("registerDiv").classList.remove("hidden"); }
+function showLogin(){ hideAll(); document.getElementById("loginDiv").classList.remove("hidden"); }
+function showProfile(){ hideAll(); document.getElementById("profile").classList.remove("hidden"); document.getElementById("welcome").innerText="Рады видеть, "+user+"!"; }
+function openCourses(){ hideAll(); document.getElementById("courses").classList.remove("hidden"); }
+function backToProfile(){ showProfile(); }
+function back(){ openCourses(); }
+
+// Логика аккаунта
+function register(){
+  const login = document.getElementById("regLogin").value.trim();
+  const pass = document.getElementById("regPass").value.trim();
+  if(!login || !pass) return alert("Заполните все поля");
+  if(localStorage.getItem(login)) return alert("Этот логин уже занят");
+  localStorage.setItem(login, pass);
+  alert("Регистрация успешна!");
+  showLogin();
+}
+
+function login(){
+  const logInput = document.getElementById("loginUser");
+  const passInput = document.getElementById("loginPass");
+  const loginVal = logInput.value.trim();
+  const passVal = passInput.value.trim();
+
+  logInput.classList.remove("input-error");
+  passInput.classList.remove("input-error");
+
+  const savedPass = localStorage.getItem(loginVal);
+
+  if(!savedPass) {
+    alert("Пользователь не найден");
+    logInput.classList.add("input-error");
+    return;
+  }
+
+  if(savedPass !== passVal) {
+    passInput.classList.add("input-error"); // КРАСНАЯ РАМКА ПРИ ОШИБКЕ
+    alert("Неверный пароль!");
+    return;
+  }
+
+  user = loginVal;
+  showProfile();
+}
+
+function logout(){ user=null; hideAll(); showLogin(); }
+
+// Обучение
+function openLesson(id){
+  currentLesson=id;
+  hideAll();
+  document.getElementById("lesson").classList.remove("hidden");
+  document.getElementById("lessonTitle").innerText=lessons[id].title;
+  document.getElementById("video").src=lessons[id].video;
+}
+
+function startTest(){
+  userAnswers=[];
+  hideAll();
+  document.getElementById("test").classList.remove("hidden");
+  const container=document.getElementById("questions");
+  container.innerHTML="";
+  tests[currentLesson].forEach((item,index)=>{
+    let div=document.createElement("div");
+    div.style.borderBottom = "1px solid #eee";
+    div.style.paddingBottom = "15px";
+    div.innerHTML=`<p><strong>${index+1}. ${item.q}</strong></p>`;
+    item.a.forEach((ans,i)=>{
+      let btn=document.createElement("button");
+      btn.innerText=ans;
+      btn.style.background = "#f0f0f0";
+      btn.style.color = "black";
+      btn.onclick=()=> {
+        Array.from(div.querySelectorAll("button")).forEach(b=>{
+            b.classList.remove("selected");
+            b.style.background = "#f0f0f0";
+            b.style.color = "black";
+        });
+        btn.classList.add("selected");
+        btn.style.background = "#FFD700";
+        userAnswers[index]=i;
+      };
+      div.appendChild(btn);
+    });
+    container.appendChild(div);
+  });
+}
+
+function showResult(){
+  const container=document.getElementById("questions");
+  let score = 0;
+  container.querySelectorAll("div").forEach((div,index)=>{
+    if(!tests[currentLesson][index]) return;
+    const correct=tests[currentLesson][index].correct;
+    const userAns=userAnswers[index];
+    if(userAns===correct) score++;
+    
+    const buttons = div.querySelectorAll("button");
+    if(userAns!=null){
+      if(userAns!==correct) buttons[userAns].classList.add("wrong");
+      buttons[correct].classList.add("correct");
+    } else {
+      buttons[correct].classList.add("correct");
+    }
+    Array.from(buttons).forEach(b=>b.disabled=true);
+  });
+
+  let res=document.createElement("h3");
+  res.innerText=`Ваш результат: ${score} из ${tests[currentLesson].length}`;
+  container.appendChild(res);
+
+  // Кнопка сертификата только при 100% ( score === 2 в данном случае )
+  if (score === tests[currentLesson].length) {
+      let certBtn = document.createElement("button");
+      certBtn.innerText = "🎓 Получить сертификат (PDF)";
+      certBtn.classList.add("cert-btn");
+      certBtn.onclick = () => generateCertificate();
+      container.appendChild(certBtn);
+  }
+
+  let retryBtn = document.createElement("button");
+  retryBtn.innerText = "Попробовать снова";
+  retryBtn.classList.add("retry-btn");
+  retryBtn.onclick = () => startTest();
+  container.appendChild(retryBtn);
+
+  let exitBtn = document.createElement("button");
+  exitBtn.innerText = "Вернуться к курсам";
+  exitBtn.style.background = "#ddd";
+  exitBtn.style.color = "black";
+  exitBtn.onclick = () => back();
+  container.appendChild(exitBtn);
+}
+
+// Генерация красивого именного сертификата
+function generateCertificate() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({orientation:"landscape", unit:"pt", format:"a4"});
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    // Фон
+    doc.setFillColor(252, 252, 255);
+    doc.rect(0, 0, pageWidth, pageHeight, 'F');
+    
+    // Рамки
+    doc.setDrawColor(102, 126, 234); 
+    doc.setLineWidth(15);
+    doc.rect(20, 20, pageWidth-40, pageHeight-40);
+    doc.setDrawColor(255, 215, 0); 
+    doc.setLineWidth(2);
+    doc.rect(40, 40, pageWidth-80, pageHeight-80);
+
+    // Контент сертификата
+    doc.setFont("helvetica","bold");
+    doc.setFontSize(50);
+    doc.setTextColor(40, 40, 100);
+    doc.text("CERTIFICATE", pageWidth/2, 140, {align:"center"});
+    
+    doc.setFontSize(20);
+    doc.setFont("helvetica","normal");
+    doc.setTextColor(60, 60, 60);
+    doc.text("This is to certify that", pageWidth/2, 210, {align:"center"});
+
+    // ИМЯ ИЗ ЛОГИНА
+    doc.setFontSize(45);
+    doc.setFont("helvetica","bolditalic");
+    doc.setTextColor(118, 75, 162);
+    doc.text(user.toUpperCase(), pageWidth/2, 270, {align:"center"});
+
+    doc.setDrawColor(200, 200, 200);
+    doc.line(pageWidth/4, 285, (pageWidth/4)*3, 285);
+
+    doc.setFontSize(18);
+    doc.setFont("helvetica","normal");
+    doc.setTextColor(80, 80, 80);
+    doc.text("has successfully mastered the skills of", pageWidth/2, 320, {align:"center"});
+
+    doc.setFontSize(28);
+    doc.setFont("helvetica","bold");
+    doc.setTextColor(40, 40, 40);
+    doc.text(lessons[currentLesson].title, pageWidth/2, 360, {align:"center"});
+
+    doc.setFontSize(12);
+    doc.setFont("helvetica","italic");
+    doc.text("Issued by CodeTeen PRO Academy", pageWidth/2, pageHeight - 80, {align:"center"});
+
+    // Печать
+    doc.setFillColor(255, 215, 0);
+    doc.circle(pageWidth - 100, pageHeight - 100, 40, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(12);
+    doc.text("TOP", pageWidth - 100, pageHeight - 105, {align:"center"});
+    doc.text("SCORE", pageWidth - 100, pageHeight - 85, {align:"center"});
+
+    doc.save(`Certificate_${user}_CodeTeen.pdf`);
+}
+</script>
+
+</body>
+</html>
